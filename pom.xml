@@ -26,6 +26,12 @@
   </dependencies>
   
   <build>
+    <resources>
+      <resource>
+        <targetPath>./src</targetPath>
+        <directory>src/main/java</directory>
+      </resource>
+    </resources>
     
     <plugins>
       <plugin>
