@@ -30,14 +30,19 @@ import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+/**
+ * Class to handle single command and whole nested structure of it.
+ * 
+ * @author raGan
+ */
 public final class CommandManager {
 	
-	Logger logger = null;
+	private final Logger logger;
 	
-	String displayedCommand = "";
-	String helpCommand = "help";
-	Object[] arguments = null;
-	Class<?>[] classes = null;
+	private final String displayedCommand;
+	private String helpCommand = "help";
+	private final Object[] arguments;
+	private final Class<?>[] classes;
 	
 	private CommandLangProvider lang = new SimpleCommandLangProvider(DefaultCommandLang.instance);
 	private final ContextFactory cFactory;
@@ -49,10 +54,22 @@ public final class CommandManager {
 	private final Map<Method, Object> instances = new HashMap<Method, Object>();
 	private final Map<Method, Command> annotations = new HashMap<Method, Command>();
 	
+	/**
+	 * This is the same as {@link CommandManager#CommandManager(ContextFactory, Logger, String, Object...) CommandManager(SimpleContextFactory.instance, logger, displayedCommand, arguments)}.
+	 * See {@link SimpleContextFactory}.
+	 */
 	public CommandManager(final Logger logger, final String displayedCommand, final Object... arguments) {
 		this(SimpleContextFactory.instance, logger, displayedCommand, arguments);
 	}
 	
+	/**
+	 * Creates new CommandManager object.
+	 * 
+	 * @param factory context factory this command manager object will use to create command context
+	 * @param logger logger object to log fails and errors, if it is null, default logger will be used
+	 * @param displayedCommand command name that will be displayed in usage messages and command strings (e.g. "/example")
+	 * @param arguments constructor arguments to instantiate command method classes
+	 */
 	public CommandManager(ContextFactory factory, final Logger logger, final String displayedCommand, final Object... arguments) {
 		Validate.notNull(factory, "Context factory can't be null.");
 		if(factory.getContextClass() == null) {
@@ -68,25 +85,55 @@ public final class CommandManager {
 		}
 	}
 	
+	/**
+	 * <p>Sets help command used in generated usage in case of no valid arguments being specified.
+	 * For example, to suggest help in form of "&lt;displayed command&gt; help", help command
+	 * must be set to "help". Command registrant is responsible for existence of the actual help command.</p>
+	 * 
+	 * @param helpCommand help command suggested in usage
+	 */
 	public void setHelpCommand(final String helpCommand) {
 		if(helpCommand != null) {
 			this.helpCommand = helpCommand;
 		}
 	}
 	
+	/**
+	 * Sets language provider used by this command manager.
+	 * 
+	 * @param provider {@link CommandLangProvider language provider} to use
+	 */
 	public void setLanguageProvider(CommandLangProvider provider) {
 		Validate.notNull(provider, "Language provider can't be null.");
 		lang = provider;
 	}
 	
+	/**
+	 * @return {@link CommandLangProvider language provider} used by this command manager
+	 */
 	public CommandLangProvider getLangProvider() {
 		return lang;
 	}
 	
+	/**
+	 * @return {@link ContextFactory context factory} used by this command manager
+	 */
 	public ContextFactory getContextFactory() {
 		return cFactory;
 	}
 	
+	/**
+	 * <p>Registers a class containing top-level command methods. Note that nested command classes
+	 * mentioned in this and recursively in all nested classes are automatically registered as well.
+	 * This method throws no exceptions, but logs all fails using the provided logger object instead.</p>
+	 * 
+	 * <p>Command manager will attempt to instantiate every registered command class using provided 
+	 * command method class constructor arguments. If instantiation fails, it will look for empty 
+	 * constructor and try to use that. If it fails too, command manager will only try to register 
+	 * static command methods in that class.</p>
+	 * 
+	 * @param clss class to register
+	 */
 	public void register(final Class<?> clss) {
 		registerMethods(null, clss);
 	}
@@ -146,7 +193,20 @@ public final class CommandManager {
 		}
 	}
 	
-	public void execute(final String[] args, final CommandSender sender) throws CommandException {
+	/**
+	 * <p>Executes the command with given arguments. Can throw CommandException and IllegalArgumentException,
+	 * all other exceptions are caught by command manager and logged as a command fail.</p>
+	 * 
+	 * @param args command arguments
+	 * @param sender sender of the, must not be null, {@link IllegalArgumentException} is thrown otherwise
+	 * @throws CommandException
+	 * @throws IllegalArgumentException can also be thrown by command itself
+	 */
+	public void execute(String[] args, final CommandSender sender) throws CommandException, IllegalArgumentException {
+		if(args == null) {
+			args = new String[0];
+		}
+		Validate.notNull(sender);
 		executeMethod(args, sender, null, 0);
 	}
 	
@@ -245,7 +305,15 @@ public final class CommandManager {
 		}
 	}
 
-	public void handleCommand(final CommandSender sender, final String[] args) {
+	/**
+	 * <p>Safe way of calling {@link #execute(String[], CommandSender) execute} method. All exceptions
+	 * thrown by that method are caught and appropriate response in sender's language is generated
+	 * and sent back to sender.</p>
+	 *  
+	 * @param sender sender of the command
+	 * @param args command arguments
+	 */
+	public void handleCommand(final String[] args, final CommandSender sender) {
 		CommandLang senderLang = lang.getCommandLang(sender);
 		try {
 			execute(args, sender);
@@ -270,8 +338,20 @@ public final class CommandManager {
 		}
 	}
 	
-	public Map<String, List<String>> getHelp(final String[] args, final CommandSender sender, final boolean deep) {
-		final Map<String, List<String>> result = new HashMap<String, List<String>>();
+	/**
+	 * <p>Generates help map for the command and its direct subcommands if it has any. Only commands the
+	 * sender has permission for are included. If the help generation is deep, help for all subcommands 
+	 * of the entered command will be generated.</p>
+	 * 
+	 * @param args command arguments (empty array will generate help for the main command)
+	 * @param sender sender of the command
+	 * @param deep true if help generation should be deep, false otherwise
+	 * @return map of {@link CommandHelp help} objects for all available commands specified by method parameters,
+	 * with all commands in the same {@link Command#section() section} grouped under the same key 
+	 * equal to the name of the command section
+	 */
+	public Map<String, List<CommandHelp>> getHelp(final String[] args, final CommandSender sender, final boolean deep) {
+		final Map<String, List<CommandHelp>> result = new HashMap<String, List<CommandHelp>>();
 		Method m = null;
 		for(final String s : args) {
 			if(labels.get(m).containsKey(s)) {
@@ -291,9 +371,10 @@ public final class CommandManager {
 		return result;
 	}
 	
-	private void addHelpToMap(final CommandSender sender, final Method method, final String[] arguments, final Map<String, List<String>> resultMap, final boolean deep) {
+	private void addHelpToMap(final CommandSender sender, final Method method, final String[] arguments, final Map<String, List<CommandHelp>> resultMap, final boolean deep) {
 		Command command = null;
 		final Map<String, Method> lbls = labels.get(method);
+		// check if the command is final, or deep help is being generated
 		if(lbls == null || deep) {
 			if(method != null) {
 				command = annotations.get(method);
@@ -302,27 +383,21 @@ public final class CommandManager {
 				}
 				else if(command != null && sender.hasPermission(command.permission())) {
 					if(resultMap.get(command.section()) == null) {
-						resultMap.put(command.section(), new ArrayList<String>());
+						resultMap.put(command.section(), new ArrayList<CommandHelp>());
 					}
-					final StringBuilder cmdString = new StringBuilder();
-					final String usage = command.usage();
-					cmdString.append(displayedCommand);
-					if(arguments.length > 0) {
-						cmdString.append(' ').append(implode(arguments));
-					}
-					if(!usage.isEmpty()) {
-						cmdString.append(' ').append(ChatColor.GOLD).append(usage);
-					}
-					cmdString.append(ChatColor.GRAY).append(" - ").append(command.desc());
-					resultMap.get(command.section()).add(cmdString.toString());
+					final String cmdString = displayedCommand + (arguments.length > 0 ? " " + implode(arguments) : "");
+					final CommandHelp cmdHelp = new CommandHelp(cmdString, command.usage(), command.desc());
+					resultMap.get(command.section()).add(cmdHelp);
 				}
 			}
 		}
+		// generate help for each subcommand
 		if(lbls != null) {
 			for(final String label : lbls.keySet()) {
 				final Method innerMethod = lbls.get(label);
 				command = annotations.get(innerMethod);
 				if(command != null && sender.hasPermission(command.permission())) {
+					// shall we go deeper?
 					if(deep) {
 						final String[] newArguments = new String[arguments.length + 1];
 						for(int i = 0; i < arguments.length; i++) {
@@ -333,20 +408,11 @@ public final class CommandManager {
 					}
 					else {
 						if(resultMap.get(command.section()) == null) {
-							resultMap.put(command.section(), new ArrayList<String>());
+							resultMap.put(command.section(), new ArrayList<CommandHelp>());
 						}
-						final StringBuilder cmdString = new StringBuilder();
-						final String usage = command.usage();
-						cmdString.append(displayedCommand);
-						if(arguments.length > 0) {
-							cmdString.append(' ').append(implode(arguments));
-						}
-						cmdString.append(' ').append(label);
-						if(!usage.isEmpty()) {
-							cmdString.append(' ').append(ChatColor.GOLD).append(usage);
-						}
-						cmdString.append(ChatColor.GRAY).append(" - ").append(command.desc());
-						resultMap.get(command.section()).add(cmdString.toString());
+						final String cmdString = displayedCommand + (arguments.length > 0 ? " " + implode(arguments) : "");
+						final CommandHelp cmdHelp = new CommandHelp(cmdString, command.usage(), command.desc());
+						resultMap.get(command.section()).add(cmdHelp);
 					}
 				}
 			}
@@ -389,6 +455,14 @@ public final class CommandManager {
 		return usage.toString();
 	}
 	
+	/**
+	 * <p>Gets usage of the specified subcommand. usage is generated for the last valid argument of the
+	 * specified command. Usage format is "&lt;displayed command&gt; + &lt;valid arguments&gt; + &lt;usage&gt;".
+	 * If no valid arguments are found, usage format is "&lt;displayed command&gt; + &lt;help command&gt;".</p>
+	 * 
+	 * @param args command arguments
+	 * @return command usage
+	 */
 	public String getUsage(final String[] args) {
 		final StringBuilder usage = new StringBuilder();
 		usage.append(displayedCommand);
@@ -411,7 +485,12 @@ public final class CommandManager {
 			}
 		}
 		if(labels.get(oldMethod) == null) {
-			usage.append(' ').append(annotations.get(oldMethod).usage());
+			if(oldMethod == null) { // if we got nowhere, suggest help
+				usage.append(' ').append(helpCommand);
+			}
+			else {
+				usage.append(' ').append(annotations.get(oldMethod).usage());
+			}
 		}
 		else {
 			final Map<String, Method> lbls = labels.get(oldMethod);
