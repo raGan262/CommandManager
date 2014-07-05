@@ -19,6 +19,7 @@ import me.ragan262.commandmanager.context.CommandContext;
 import me.ragan262.commandmanager.context.ContextFactory;
 import me.ragan262.commandmanager.context.SimpleContextFactory;
 import me.ragan262.commandmanager.exceptions.CommandException;
+import me.ragan262.commandmanager.exceptions.CommandExceptionHandler;
 import me.ragan262.commandmanager.exceptions.PermissionException;
 import me.ragan262.commandmanager.exceptions.UsageException;
 import me.ragan262.commandmanager.lang.CommandLang;
@@ -46,6 +47,7 @@ public final class CommandManager {
 	
 	private CommandLangProvider lang = new SimpleCommandLangProvider(DefaultCommandLang.instance);
 	private final ContextFactory cFactory;
+	private CommandExceptionHandler exceptionHandler;
 	
 	private final Map<Method, Map<String, Method>> labels =
 			new HashMap<Method, Map<String, Method>>();
@@ -83,6 +85,11 @@ public final class CommandManager {
 		for(int i = 0; i < arguments.length; i++) {
 			classes[i] = arguments[i].getClass();
 		}
+		exceptionHandler = new CommandExceptionHandler() {
+			public void handleException(Exception e, CommandSender sender) {
+				sender.sendMessage(ChatColor.RED + e.getMessage());
+			}
+		};
 	}
 	
 	/**
@@ -106,6 +113,12 @@ public final class CommandManager {
 	public void setLanguageProvider(CommandLangProvider provider) {
 		Validate.notNull(provider, "Language provider can't be null.");
 		lang = provider;
+	}
+	
+	public void setExceptionHandler(CommandExceptionHandler handler) {
+		if(handler != null) {
+			
+		}
 	}
 	
 	/**
@@ -199,10 +212,9 @@ public final class CommandManager {
 	 * 
 	 * @param args command arguments
 	 * @param sender sender of the, must not be null, {@link IllegalArgumentException} is thrown otherwise
-	 * @throws CommandException
-	 * @throws IllegalArgumentException can also be thrown by command itself
+	 * @throws Exception everything thrown by commandmanager or command itself
 	 */
-	public void execute(String[] args, final CommandSender sender) throws CommandException, IllegalArgumentException {
+	public void execute(String[] args, final CommandSender sender) throws Exception {
 		if(args == null) {
 			args = new String[0];
 		}
@@ -210,7 +222,7 @@ public final class CommandManager {
 		executeMethod(args, sender, null, 0);
 	}
 	
-	private void executeMethod(final String[] args, final CommandSender sender, final Method parent, int level) throws CommandException {
+	private void executeMethod(final String[] args, final CommandSender sender, final Method parent, int level) throws Exception {
 		
 		CommandLang senderLang = lang.getCommandLang(sender);
 		
@@ -278,27 +290,21 @@ public final class CommandManager {
 		invoke(method, context, sender);
 	}
 	
-	private void invoke(final Method method, final Object... methodArgs) throws CommandException, NumberFormatException {
+	private void invoke(final Method method, final Object... methodArgs) throws Exception {
 		Exception ex = null;
 		try {
 			method.invoke(instances.get(method), methodArgs);
 		}
-		catch (final IllegalAccessException e) {
-			ex = e;
-		}
-		catch (final IllegalArgumentException e) {
-			ex = e;
-		}
 		catch (final InvocationTargetException e) {
-			if(e.getCause() instanceof CommandException) {
-				throw (CommandException) e.getCause();
-			}
-			else if(e.getCause() instanceof IllegalArgumentException) {
-				throw (IllegalArgumentException) e.getCause();
+			if(e.getCause() instanceof Exception) {
+				throw (Exception)e.getCause();
 			}
 			else {
 				ex = e;
 			}
+		}
+		catch (Exception e){
+			ex = e;
 		}
 		if(ex != null) {
 			logger.log(Level.SEVERE, "Failed to execute command.", ex);
@@ -335,6 +341,9 @@ public final class CommandManager {
 		}
 		catch (final IllegalArgumentException e) {
 			sender.sendMessage(ChatColor.RED + senderLang.invalidArgMessage(e.getMessage()));
+		}
+		catch (Exception e) {
+			exceptionHandler.handleException(e, sender);
 		}
 	}
 	
