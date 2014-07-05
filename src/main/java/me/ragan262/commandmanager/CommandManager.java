@@ -407,19 +407,19 @@ public final class CommandManager {
 				command = annotations.get(innerMethod);
 				if(command != null && sender.hasPermission(command.permission())) {
 					// shall we go deeper?
+					final String[] actualArguments = new String[arguments.length + 1];
+					for(int i = 0; i < arguments.length; i++) {
+						actualArguments[i] = arguments[i];
+					}
+					actualArguments[arguments.length] = label;
 					if(deep) {
-						final String[] newArguments = new String[arguments.length + 1];
-						for(int i = 0; i < arguments.length; i++) {
-							newArguments[i] = arguments[i];
-						}
-						newArguments[arguments.length] = label;
-						addHelpToMap(sender, innerMethod, newArguments, resultMap, deep);
+						addHelpToMap(sender, innerMethod, actualArguments, resultMap, deep);
 					}
 					else {
 						if(resultMap.get(command.section()) == null) {
 							resultMap.put(command.section(), new ArrayList<CommandHelp>());
 						}
-						final String cmdString = displayedCommand + (arguments.length > 0 ? " " + implode(arguments) : "");
+						final String cmdString = displayedCommand + (actualArguments.length > 0 ? " " + implode(actualArguments) : "");
 						final CommandHelp cmdHelp = new CommandHelp(cmdString, command.usage(), command.desc());
 						resultMap.get(command.section()).add(cmdHelp);
 					}
