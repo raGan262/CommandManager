@@ -86,7 +86,7 @@ public final class CommandManager {
 			classes[i] = arguments[i].getClass();
 		}
 		exceptionHandler = new CommandExceptionHandler() {
-			public void handleException(Exception e, CommandSender sender) {
+			public void handleException(Throwable e, CommandSender sender) {
 				sender.sendMessage(ChatColor.RED + e.getMessage());
 			}
 		};
@@ -214,7 +214,7 @@ public final class CommandManager {
 	 * @param sender sender of the, must not be null, {@link IllegalArgumentException} is thrown otherwise
 	 * @throws Exception everything thrown by commandmanager or command itself
 	 */
-	public void execute(String[] args, final CommandSender sender) throws Exception {
+	public void execute(String[] args, final CommandSender sender) throws Throwable {
 		if(args == null) {
 			args = new String[0];
 		}
@@ -222,7 +222,7 @@ public final class CommandManager {
 		executeMethod(args, sender, null, 0);
 	}
 	
-	private void executeMethod(final String[] args, final CommandSender sender, final Method parent, int level) throws Exception {
+	private void executeMethod(final String[] args, final CommandSender sender, final Method parent, int level) throws Throwable {
 		
 		CommandLang senderLang = lang.getCommandLang(sender);
 		
@@ -290,23 +290,15 @@ public final class CommandManager {
 		invoke(method, context, sender);
 	}
 	
-	private void invoke(final Method method, final Object... methodArgs) throws Exception {
-		Exception ex = null;
+	private void invoke(final Method method, final Object... methodArgs) throws Throwable {
+		Throwable ex = null;
 		try {
 			method.invoke(instances.get(method), methodArgs);
 		}
 		catch (final InvocationTargetException e) {
-			if(e.getCause() instanceof Exception) {
-				throw (Exception)e.getCause();
-			}
-			else {
-				ex = e;
-			}
+			throw e.getCause();
 		}
-		catch (Exception e){
-			ex = e;
-		}
-		if(ex != null) {
+		catch (Throwable e){
 			logger.log(Level.SEVERE, "Failed to execute command.", ex);
 		}
 	}
@@ -342,7 +334,7 @@ public final class CommandManager {
 		catch (final IllegalArgumentException e) {
 			sender.sendMessage(ChatColor.RED + senderLang.invalidArgMessage(e.getMessage()));
 		}
-		catch (Exception e) {
+		catch (Throwable e) {
 			exceptionHandler.handleException(e, sender);
 		}
 	}

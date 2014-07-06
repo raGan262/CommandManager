@@ -16,6 +16,6 @@ public interface CommandExceptionHandler {
 	 * @param e exception thrown by a command
 	 * @param sender command sender
 	 */
-	public void handleException(Exception e, CommandSender sender);
+	public void handleException(Throwable e, CommandSender sender);
 	
 }
