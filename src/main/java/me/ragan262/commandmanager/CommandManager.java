@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
 import me.ragan262.commandmanager.annotations.Command;
 import me.ragan262.commandmanager.annotations.CommandLabels;
 import me.ragan262.commandmanager.annotations.NestedCommand;
@@ -25,7 +24,6 @@ import me.ragan262.commandmanager.exceptions.UsageException;
 import me.ragan262.commandmanager.lang.CommandLang;
 import me.ragan262.commandmanager.lang.CommandLangProvider;
 import me.ragan262.commandmanager.lang.SimpleCommandLangProvider;
-
 import org.apache.commons.lang.Validate;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
@@ -256,7 +254,7 @@ public final class CommandManager {
 		if(cmd.player() && !(sender instanceof Player)) {
 			throw new CommandException(senderLang.playerContextMessage());
 		}
-		if(sender == null || !sender.hasPermission(cmd.permission())) {
+		if(sender == null || !hasPermission(sender, cmd.permission())) {
 			throw new PermissionException(cmd.permission());
 		}
 		
@@ -364,7 +362,7 @@ public final class CommandManager {
 			else {
 				throw new IllegalArgumentException(s);
 			}
-			if(!sender.hasPermission(annotations.get(m).permission())) {
+			if(!hasPermission(sender, annotations.get(m).permission())) {
 				return result;
 			}
 		}
@@ -382,7 +380,7 @@ public final class CommandManager {
 				if(lbls != null && !command.forceExecute()) {
 					// we don't want to display command groups
 				}
-				else if(command != null && sender.hasPermission(command.permission())) {
+				else if(command != null && hasPermission(sender, command.permission())) {
 					if(resultMap.get(command.section()) == null) {
 						resultMap.put(command.section(), new ArrayList<CommandHelp>());
 					}
@@ -397,7 +395,7 @@ public final class CommandManager {
 			for(final String label : lbls.keySet()) {
 				final Method innerMethod = lbls.get(label);
 				command = annotations.get(innerMethod);
-				if(command != null && sender.hasPermission(command.permission())) {
+				if(command != null && hasPermission(sender, command.permission())) {
 					// shall we go deeper?
 					final String[] actualArguments = new String[arguments.length + 1];
 					for(int i = 0; i < arguments.length; i++) {
@@ -546,6 +544,18 @@ public final class CommandManager {
 			logger.log(Level.WARNING, "CommandManager could not create an instance of a class '" + clss.getCanonicalName() + "'.");
 		}
 		return null;
+	}
+	
+	private boolean hasPermission(CommandSender sender, String perm) {
+		if(perm.isEmpty()) {
+			return true;
+		}
+		for(final String s : perm.split("\\|\\|")) {
+			if(sender.hasPermission(s)) {
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	private String implode(final String[] strs) {
