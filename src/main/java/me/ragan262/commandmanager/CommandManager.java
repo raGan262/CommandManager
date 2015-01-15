@@ -115,7 +115,7 @@ public final class CommandManager {
 	
 	public void setExceptionHandler(CommandExceptionHandler handler) {
 		if(handler != null) {
-			
+			exceptionHandler = handler;
 		}
 	}
 	
